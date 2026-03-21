@@ -9,7 +9,7 @@ from datetime import datetime
 import time
 
 # ===================================
-# PAGE CONFIG
+# PAGE CONFIGs
 # ===================================
 st.set_page_config(
     page_title="Measles AI Intelligence",

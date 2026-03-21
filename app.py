@@ -158,8 +158,6 @@ MI_FEATURES = [
     "SIAs_in_past_3yrs", "Internet_penetration (%)",
 ]
 
-ALL_FEATURES = list(dict.fromkeys(RFE_FEATURES + MI_FEATURES))
-
 FEATURE_CONFIGS = {
     "Reported_measles_cases":                {"min": 0,     "max": 500000,    "default": 500,    "step": 1},
     "Suspected_measles_cases":               {"min": 0,     "max": 500000,    "default": 1000,   "step": 1},
@@ -241,7 +239,7 @@ def _build(arch, n_features):
 @st.cache_resource
 def load_models(feature_method: str):
     base_dir = f"models/"
-    n_features = len(RFE_FEATURES) if feature_method == "RFE" else len(MI_FEATURES)
+    n_features = 21  
     models = {}
     for name in ["LSTM", "BiLSTM", "GRU"]:
         path = os.path.join(base_dir, f"{name}.weights.h5")
@@ -438,7 +436,7 @@ def render_model_breakdown(model_results, final_pred=None, final_prob=None):
             )
 
 def generate_template_csv(feature_set: str, n_rows: int = 3):
-    feats = RFE_FEATURES if feature_set == "RFE" else MI_FEATURES
+    feats = MI_FEATURES  # Fixed to use 21 features (MI method)
     rows = []
     for i in range(n_rows):
         row = {f: FEATURE_CONFIGS.get(f, {}).get("default", 0) for f in feats}
@@ -460,13 +458,11 @@ st.markdown("""
 with st.sidebar:
     st.markdown("### Model Configuration")
     st.markdown("---")
-    feature_method = st.selectbox(
-        "Feature Selection Method",
-        ["RFE", "MI"],
-        help="RFE = 10 features (Recursive Feature Elimination)\nMI = 21 features (Mutual Information)"
-    )
-    active_features = RFE_FEATURES if feature_method == "RFE" else MI_FEATURES
+    # Fixed to use 21 features (MI method) - only one model available
+    feature_method = "MI"
+    active_features = MI_FEATURES
     st.markdown(f"**Features used:** `{len(active_features)}`")
+    st.markdown(f"**Method:** Mutual Information (21 features)")
     st.markdown("""
     <div style='margin:0.5rem 0;'>
       <span style='background:#1a2233;border:1px solid #2ec4b6;color:#ffffff;font-size:0.75rem;padding:0.2rem 0.6rem;border-radius:20px;margin:0.2rem;display:inline-block;'>✓ LSTM</span>
@@ -545,14 +541,6 @@ with tab2:
         section("📥 Download Templates")
         st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
 
-        rfe_csv = generate_template_csv("RFE")
-        st.download_button(
-            label="⬇  RFE Template (10 features)",
-            data=rfe_csv,
-            file_name="measles_template_RFE.csv",
-            mime="text/csv",
-            key="dl_rfe"
-        )
         st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
         mi_csv = generate_template_csv("MI")
         st.download_button(

@@ -140,10 +140,12 @@ hr { border-color: var(--border) !important; }
 
 # ─── Constants ─────────────────────────────────────────────────────────────────
 RFE_FEATURES = [
-    "Reported_measles_cases", "Suspected_measles_cases", "Measles_deaths",
-    "MCV1_coverage (%)", "MCV2_coverage (%)", "DTP3_coverage (%)",
-    "Measles_incidence_rate (per million)", "GoogleTrends_index",
-    "Dropout_rate (MCV1-MCV2)", "Air_travel_volume (million passengers)",
+    "Measles_deaths", "MCV1_coverage (%)", "MCV2_coverage (%)", "DTP3_coverage (%)",
+    "Urbanization (%)", "Birth_rate (per 1000)", "Proportion_under5 (%)", "GDP_per_capita (US$)",
+    "Hospital_beds_per_1000", "Physicians_per_10000", "GoogleTrends_index",
+    "Measles_incidence_rate (per million)", "SIAs_in_past_3yrs", "Internet_penetration (%)",
+    "Routine_immunization_dropout (%)", "Avg_Annual_Temperature", "Avg_Annual_Humidity",
+    "Rainy_Season_Length", "Temp_Seasonality", "Dry_Season_Length", "Extreme_Rain_Days"
 ]
 
 MI_FEATURES = [
@@ -157,6 +159,48 @@ MI_FEATURES = [
     "Hospital_beds_per_1000", "Physicians_per_10000",
     "SIAs_in_past_3yrs", "Internet_penetration (%)",
 ]
+
+PCA_PC1_FEATURES = [
+    "Population", "Reported_measles_cases", "Suspected_measles_cases",
+    "Total_Annual_Rainfall", "Measles_incidence_rate (per million)"
+]
+PCA_PC2_FEATURES = [
+    "Reported_measles_cases", "Measles_incidence_rate (per million)",
+    "Suspected_measles_cases", "Total_Annual_Rainfall",
+    "Health_expenditure_per_capita (US$)"
+]
+PCA_PC3_FEATURES = [
+    "Suspected_measles_cases", "Measles_deaths", "Health_expenditure_per_capita (US$)",
+    "Total_Annual_Rainfall", "Reported_measles_cases"
+]
+PCA_PC4_FEATURES = [
+    "Health_expenditure_per_capita (US$)", "Measles_incidence_rate (per million)",
+    "Suspected_measles_cases", "Total_Annual_Rainfall", "Internet_penetration (%)"
+]
+PCA_PC5_FEATURES = [
+    "Total_Annual_Rainfall", "Measles_incidence_rate (per million)",
+    "Health_expenditure_per_capita (US$)", "Extreme_Rain_Days", "Avg_Annual_Humidity"
+]
+
+FEATURE_SETS = {
+    "Mutual Information (21 features)": MI_FEATURES,
+    "Recursive Feature Elimination (21 features)": RFE_FEATURES,
+    "PCA Component 1 (Top 5)": PCA_PC1_FEATURES,
+    "PCA Component 2 (Top 5)": PCA_PC2_FEATURES,
+    "PCA Component 3 (Top 5)": PCA_PC3_FEATURES,
+    "PCA Component 4 (Top 5)": PCA_PC4_FEATURES,
+    "PCA Component 5 (Top 5)": PCA_PC5_FEATURES,
+}
+
+MODEL_DIR_MAP = {
+    "Mutual Information (21 features)": "MI",
+    "Recursive Feature Elimination (21 features)": "RFE",
+    "PCA Component 1 (Top 5)": "PCA",
+    "PCA Component 2 (Top 5)": "PCA",
+    "PCA Component 3 (Top 5)": "PCA",
+    "PCA Component 4 (Top 5)": "PCA",
+    "PCA Component 5 (Top 5)": "PCA",
+}
 
 FEATURE_CONFIGS = {
     "Reported_measles_cases":                {"min": 0,     "max": 500000,    "default": 500,    "step": 1},
@@ -180,6 +224,10 @@ FEATURE_CONFIGS = {
     "Physicians_per_10000":                  {"min": 0.0,   "max": 100.0,     "default": 5.0,    "step": 0.1},
     "SIAs_in_past_3yrs":                     {"min": 0,     "max": 3,         "default": 1,      "step": 1},
     "Internet_penetration (%)":              {"min": 0.0,   "max": 100.0,     "default": 40.0,   "step": 0.1},
+    "Total_Annual_Rainfall":                 {"min": 0.0,   "max": 10000.0,   "default": 100.0,  "step": 0.1},
+    "Extreme_Rain_Days":                     {"min": 0.0,   "max": 366.0,     "default": 10.0,   "step": 1.0},
+    "Avg_Annual_Humidity":                   {"min": 0.0,   "max": 100.0,     "default": 60.0,   "step": 0.1},
+    "Routine_immunization_dropout (%)":      {"min": 0.0,   "max": 100.0,     "default": 5.0,    "step": 0.1},
 }
 
 # World Bank indicator codes
@@ -238,15 +286,18 @@ def _build(arch, n_features):
 
 @st.cache_resource
 def load_models(feature_method: str):
-    base_dir = f"models/"
-    n_features = 21  
+    model_subdir = MODEL_DIR_MAP.get(feature_method, "MI")
+    base_dir = os.path.join("models", model_subdir)
+    n_features = len(FEATURE_SETS.get(feature_method, MI_FEATURES))
     models = {}
+
     for name in ["LSTM", "BiLSTM", "GRU"]:
         path = os.path.join(base_dir, f"{name}.weights.h5")
         if os.path.exists(path):
             m = _build(name, n_features)
             m.load_weights(path)
             models[name] = m
+
     meta_path = os.path.join(base_dir, "MetaLearner_LogisticRegression.pkl")
     meta = joblib.load(meta_path) if os.path.exists(meta_path) else None
     return models, meta
@@ -436,7 +487,7 @@ def render_model_breakdown(model_results, final_pred=None, final_prob=None):
             )
 
 def generate_template_csv(feature_set: str, n_rows: int = 3):
-    feats = MI_FEATURES  # Fixed to use 21 features (MI method)
+    feats = FEATURE_SETS.get(feature_set, MI_FEATURES)
     rows = []
     for i in range(n_rows):
         row = {f: FEATURE_CONFIGS.get(f, {}).get("default", 0) for f in feats}
@@ -458,11 +509,19 @@ st.markdown("""
 with st.sidebar:
     st.markdown("### Model Configuration")
     st.markdown("---")
-    # Fixed to use 21 features (MI method) - only one model available
-    feature_method = "MI"
-    active_features = MI_FEATURES
+
+    feature_method = st.selectbox(
+        "Feature selection method",
+        options=list(FEATURE_SETS.keys()),
+        index=list(FEATURE_SETS.keys()).index("Mutual Information (21 features)")
+    )
+
+    active_features = FEATURE_SETS.get(feature_method, MI_FEATURES)
+    model_group = MODEL_DIR_MAP.get(feature_method, "MI")
+
     st.markdown(f"**Features used:** `{len(active_features)}`")
-    st.markdown(f"**Method:** Mutual Information (21 features)")
+    st.markdown(f"**Method:** {feature_method}")
+    st.markdown(f"**Model source folder:** `models/{model_group}`")
     st.markdown("""
     <div style='margin:0.5rem 0;'>
       <span style='background:#1a2233;border:1px solid #2ec4b6;color:#ffffff;font-size:0.75rem;padding:0.2rem 0.6rem;border-radius:20px;margin:0.2rem;display:inline-block;'>✓ LSTM</span>
@@ -542,13 +601,13 @@ with tab2:
         st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
 
         st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
-        mi_csv = generate_template_csv("MI")
+        template_csv = generate_template_csv(feature_method)
         st.download_button(
-            label="⬇  MI Template (21 features)",
-            data=mi_csv,
-            file_name="measles_template_MI.csv",
+            label=f"⬇  {feature_method} Template ({len(active_features)} features)",
+            data=template_csv,
+            file_name=f"measles_template_{feature_method.replace(' ', '_').replace('(', '').replace(')', '')}.csv",
             mime="text/csv",
-            key="dl_mi"
+            key="dl_template"
         )
         st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
         st.markdown("""

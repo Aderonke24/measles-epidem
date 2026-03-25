@@ -17,7 +17,7 @@ try:
 except ImportError:
     TF_AVAILABLE = False
 
-# ─── Page Config ───────────────────────────────────────────────────────────────
+# ─── Pages Config ───────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Measles Outbreak Predictor",
     page_icon="",
